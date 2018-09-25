@@ -1,0 +1,20 @@
+# .gitignore
+# Thanasis Zoumpekas (thanasis.z@hotmail.com)
+# Codename : thzou
+
+# Vim swap files
+*.swp
+
+# PDF files
+*.pdf
+
+# zip files
+*.zip
+
+# csv files
+*.csv
+
+# Html files
+*.html
+
+# Folders
