@@ -5,11 +5,11 @@ Customer Churn Analysis using R &amp; RStudio
 
 
 * Feature Importance Analysis
-** Learning Vector Quantization (LVQ)
-** Boosted Classification Trees
-** Support Vector Machines with Radial Basis Function Kernel
+	- Learning Vector Quantization (LVQ)
+	- Boosted Classification Trees
+	- Support Vector Machines with Radial Basis Function Kernel
 
 * Feature Selection
-** Recursive Feature Elimination (RFE)
+	- Recursive Feature Elimination (RFE)
 
 * Logistic Regression 
