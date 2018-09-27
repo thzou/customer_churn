@@ -1,7 +1,7 @@
 # customer_churn
 Customer Churn Analysis using R &amp; RStudio
 
-* Data : [IBM Sample Datasets-Telco Customer Churn]{https://www.ibm.com/communities/analytics/watson-analytics-blog/guide-to-sample-datasets/}
+* Data : [IBM Sample Datasets-Telco Customer Churn](https://www.ibm.com/communities/analytics/watson-analytics-blog/guide-to-sample-datasets/)
 
 
 * Feature Importance Analysis
