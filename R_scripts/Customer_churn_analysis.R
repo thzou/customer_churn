@@ -182,3 +182,229 @@ df_final <- cbind(telco_int,dummy)
 
 col_names <- names(df_final[,-c(1:3)])
 df_final[,col_names] <- lapply(df_final[,col_names] , factor)
+
+#########FEATURE IMPORTANCE##########
+
+
+
+###LVQ method
+
+set.seed(6)
+library(e1071)
+library(mlbench)
+library(caret)
+library(doParallel)
+
+cl <- makeCluster(4)
+registerDoParallel(cl)
+
+# prepare training scheme
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+# train the model
+model_lvq <- train(Churn~., data=df_final, method="lvq", trControl=control)
+# estimate variable importance
+importance_lvq <- varImp(model_lvq, scale=FALSE)
+stopCluster(cl)
+# summarize importance
+print(importance_lvq)
+plot(importance_lvq)
+
+
+
+###ADA method
+
+set.seed(7)
+cl <- makeCluster(4)
+registerDoParallel(cl)
+
+# prepare training scheme
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+# train the model
+model_ada <- train(Churn~., data=df_final, method="ada", trControl=control)
+# estimate variable importance
+importance_ada <- varImp(model_ada, scale=FALSE)
+
+stopCluster(cl)
+# summarize importance
+print(importance_ada)
+# plot importance
+plot(importance_ada)
+
+
+###SVM Radial kernel method
+
+set.seed(8)
+cl <- makeCluster(4)
+registerDoParallel(cl)
+
+# prepare training scheme
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+# train the model
+model_svm <- train(Churn~., data=df_final, method="svmRadial", trControl=control)
+# estimate variable importance
+importance_svm <- varImp(model_svm, scale=FALSE)
+stopCluster(cl)
+# summarize importance
+print(importance_svm)
+# plot importance
+plot(importance_svm)
+
+
+
+##########FEATURE SELECTION##########
+
+
+### Recursive Feature Elimination ###
+
+y = df_final$Churn
+x = subset(df_final, select = -c(Churn)) 
+
+# define the control using a random forest selection function
+cl <- makeCluster(4)
+registerDoParallel(cl)
+control <- rfeControl(functions=rfFuncs, method="cv", number=10, repeats=3)
+# run the RFE algorithm
+results <- rfe(x, y, rfeControl=control)
+stopCluster(cl)
+# summarize the results
+print(results)
+# list the chosen features
+predictors(results)
+# plot the results
+plot(results, type=c("g", "o"))
+
+
+
+### Logistic Regression ###
+
+
+#Splitting the data
+set.seed(123)
+indices = sample.split(df_final$Churn, SplitRatio = 0.65)
+train = df_final[indices,]
+validation = df_final[!(indices),]
+
+cl <- makeCluster(4)
+registerDoParallel(cl)
+
+#Build the first model using all variables
+model_1 = glm(Churn ~ ., data = train, family = "binomial")
+summary(model_1)
+
+stopCluster(cl)
+
+
+
+model_2 <- stepAIC(model_1, direction="both",trace = 0)
+summary(model_2)
+
+vif(model_2)
+
+
+
+
+model_3 <-glm(formula = Churn ~ tenure + MonthlyCharges + SeniorCitizen + 
+                InternetService.xFiber.optic + InternetService.xNo + 
+                OnlineSecurity + OnlineBackup + TechSupport + StreamingTV + Contract.xOne.year + Contract.xTwo.year + PaperlessBilling + 
+                PaymentMethod.xElectronic.check + tenure_bin.x1.2.years + 
+                tenure_bin.x5.6.years, family = "binomial", data = train)
+
+summary(model_3)
+
+vif(model_3)
+
+
+
+
+
+model_4 <-glm(formula = Churn ~ tenure + MonthlyCharges + SeniorCitizen + 
+                InternetService.xFiber.optic + InternetService.xNo + OnlineSecurity + OnlineBackup + TechSupport + 
+                Contract.xOne.year + Contract.xTwo.year + PaperlessBilling + 
+                PaymentMethod.xElectronic.check + tenure_bin.x1.2.years + 
+                tenure_bin.x5.6.years, family = "binomial", data = train)
+
+summary(model_4)
+
+vif(model_4)
+
+
+### Model Evaluation ###
+
+final_model <- model_4 #keep the final model
+
+
+pred <- predict(final_model, type = "response", newdata = validation[,-24])
+summary(pred)
+validation$prob <- pred
+
+# Using probability cutoff of 50%.
+
+pred_churn <- factor(ifelse(pred >= 0.50, "Yes", "No"))
+actual_churn <- factor(ifelse(validation$Churn==1,"Yes","No"))
+table(actual_churn,pred_churn)
+
+cutoff_churn <- factor(ifelse(pred >=0.50, "Yes", "No"))
+conf_final <- confusionMatrix(cutoff_churn, actual_churn, positive = "Yes")
+accuracy <- conf_final$overall[1]
+sensitivity <- conf_final$byClass[1]
+specificity <- conf_final$byClass[2]
+
+round(accuracy,digits=2)
+round(sensitivity,digits=2)
+round(specificity,digits=2)
+
+
+perform_fn <- function(cutoff) 
+{
+  predicted_churn <- factor(ifelse(pred >= cutoff, "Yes", "No"))
+  conf <- confusionMatrix(predicted_churn, actual_churn, positive = "Yes")
+  accuray <- conf$overall[1]
+  sensitivity <- conf$byClass[1]
+  specificity <- conf$byClass[2]
+  out <- t(as.matrix(c(sensitivity, specificity, accuray))) 
+  colnames(out) <- c("sensitivity", "specificity", "accuracy")  return(out)
+}
+
+summary(pred)
+s = seq(0.01,0.80,length=100)
+OUT = matrix(0,100,3)
+
+for(i in 1:100)
+{
+  OUT[i,] = perform_fn(s[i])
+} 
+
+plot(s, OUT[,1],xlab="Cutoff",ylab="Value",cex.lab=1.5,cex.axis=1.5,ylim=c(0,1),
+     type="l",lwd=2,axes=FALSE,col=2)
+axis(1,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+axis(2,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+lines(s,OUT[,2],col="darkgreen",lwd=2)
+lines(s,OUT[,3],col=4,lwd=2)
+box()
+legend("bottom",col=c(2,"darkgreen",4,"darkred"),text.font =3,inset = 0.02,
+       box.lty=0,cex = 0.8, 
+       lwd=c(2,2,2,2),c("Sensitivity","Specificity","Accuracy"))
+abline(v = 0.32, col="red", lwd=1, lty=2)
+axis(1, at = seq(0.1, 1, by = 0.1))
+
+
+optimal_cutoff <- s[which(abs(OUT[,1]-OUT[,2])<0.01)]
+
+cat("\n\nOptimal Cutoff : ", optimal_cutoff)
+
+cutoff_churn <- factor(ifelse(pred >= optimal_cutoff, "Yes", "No"))
+conf_final <- confusionMatrix(cutoff_churn, actual_churn, positive = "Yes")
+accuracy <- conf_final$overall[1]
+sensitivity <- conf_final$byClass[1]
+specificity <- conf_final$byClass[2]
+
+accuracy = round(accuracy,digits=2)
+sensitivity = round(sensitivity,digits=2)
+specificity = round(specificity,digits=2)
+
+
+
+summary(final_model)
+
+perf_metrics <- data_frame(accuracy,sensitivity,specificity)
+perf_metrics
